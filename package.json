@@ -1,0 +1,24 @@
+{
+  "name": "gift-moment-server",
+  "version": "1.0.0",
+  "description": "🎁 server - node.js / express / RDS / EC2 🎁",
+  "main": "index.js",
+  "scripts": {
+    "start" : "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luckynode/gift-moment-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/luckynode/gift-moment-server/issues"
+  },
+  "homepage": "https://github.com/luckynode/gift-moment-server#readme",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
