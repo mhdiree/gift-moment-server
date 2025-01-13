@@ -71,10 +71,14 @@ exports.getUserNameAndBirthday = async (req, res) => {
             formattedBirthday = `${month}월 ${day}일`;
         }
 
+        // 기존 회원 여부 확인
+        const isExistingUser = user.birth_date !== null;
+
         // 응답 데이터
         return response.success(res, 'User information fetched successfully', {
             name: user.name,
-            birthday: formattedBirthday
+            birthday: formattedBirthday,
+            isExistingUser
         });
     } catch (error) {
         console.error('Error fetching user name and birthday:', error);
