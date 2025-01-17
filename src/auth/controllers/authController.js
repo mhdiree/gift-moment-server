@@ -48,6 +48,44 @@ exports.kakaoLogin = async (req, res) => {
     }
 };
 
+// 회원 이름 및 생일 정보 반환
+exports.getUserNameAndBirthday = async (req, res) => {
+    const userId = req.user.id; // JWT에서 인증된 사용자 ID
+
+    try {
+        // members 테이블에서 사용자 정보 조회
+        const [rows] = await pool.query('SELECT name, birth_date FROM members WHERE id = ?', [userId]);
+
+        if (!rows.length) {
+            return response.error(res, 'User not found', 404);
+        }
+
+        const user = rows[0];
+
+        // 생일 형식 변환 (YYYY-MM-DD -> @월 @일)
+        let formattedBirthday = null;
+        if (user.birth_date) {
+            const birthDate = new Date(user.birth_date);
+            const month = birthDate.getMonth() + 1; // 월 (0부터 시작하므로 +1)
+            const day = birthDate.getDate(); // 일
+            formattedBirthday = `${month}월 ${day}일`;
+        }
+
+        // 기존 회원 여부 확인
+        const isExistingUser = user.birth_date !== null;
+
+        // 응답 데이터
+        return response.success(res, 'User information fetched successfully', {
+            name: user.name,
+            birthday: formattedBirthday,
+            isExistingUser
+        });
+    } catch (error) {
+        console.error('Error fetching user name and birthday:', error);
+        return response.error(res, 'Failed to fetch user information', 500);
+    }
+};
+
 // 사용자 프로필 정보 가져오기
 exports.getUserProfile = async (req, res) => {
     const userId = req.user.id; // JWT에서 인증된 사용자 ID

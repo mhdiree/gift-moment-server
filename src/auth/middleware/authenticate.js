@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const jwtUtil = require('../utils/jwt');
 const response = require('../utils/response');
 
 module.exports = (req, res, next) => {
@@ -10,7 +10,7 @@ module.exports = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        const decoded = jwtUtil.verifyToken(token);
         req.user = decoded; // 인증된 사용자 정보
         next();
     } catch (error) {
