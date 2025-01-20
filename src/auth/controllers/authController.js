@@ -16,6 +16,7 @@ exports.kakaoLogin = async (req, res) => {
 
         const email = kakaoUser.kakao_account.email;
         const name = kakaoUser.properties.nickname;
+        let isExistingUser = false;
 
         // DB에서 사용자 확인
         const [rows] = await pool.query('SELECT * FROM members WHERE email = ?', [email]);
@@ -24,6 +25,7 @@ exports.kakaoLogin = async (req, res) => {
         if (rows.length) {
             // 기존 회원
             user = rows[0];
+            isExistingUser = true;
         } else {
             // 신규 회원 등록
             const [result] = await pool.query(
@@ -40,7 +42,8 @@ exports.kakaoLogin = async (req, res) => {
         return response.success(res, 'Login successful', {
             token,
             email: user.email,
-            name: user.name
+            name: user.name,
+            isExistingUser: isExistingUser
         });
     } catch (error) {
         console.error('Error during Kakao login:', error);
@@ -54,31 +57,35 @@ exports.getUserNameAndBirthday = async (req, res) => {
 
     try {
         // members 테이블에서 사용자 정보 조회
-        const [rows] = await pool.query('SELECT name, birth_date FROM members WHERE id = ?', [userId]);
+        const [rows2] = await pool.query('SELECT name, birth_date FROM members WHERE id = ?', [userId]);
 
-        if (!rows.length) {
+        if (!rows2.length) {
             return response.error(res, 'User not found', 404);
         }
 
-        const user = rows[0];
+        const user = rows2[0];
 
         // 생일 형식 변환 (YYYY-MM-DD -> @월 @일)
         let formattedBirthday = null;
+        let isBirthday = false;
         if (user.birth_date) {
             const birthDate = new Date(user.birth_date);
             const month = birthDate.getMonth() + 1; // 월 (0부터 시작하므로 +1)
             const day = birthDate.getDate(); // 일
             formattedBirthday = `${month}월 ${day}일`;
-        }
 
-        // 기존 회원 여부 확인
-        const isExistingUser = user.birth_date !== null;
+            // 오늘 날짜와 비교하여 생일 여부 확인
+            const today = new Date();
+            if (today.getMonth() + 1 === month && today.getDate() === day) {
+                isBirthday = true;
+            }
+        }
 
         // 응답 데이터
         return response.success(res, 'User information fetched successfully', {
             name: user.name,
             birthday: formattedBirthday,
-            isExistingUser
+            isBirthday
         });
     } catch (error) {
         console.error('Error fetching user name and birthday:', error);
@@ -110,19 +117,48 @@ exports.updateUserProfile = async (req, res) => {
     const userId = req.user.id; // JWT에서 인증된 사용자 ID
     const { name, email, birth_date } = req.body;
 
-    if (!name || !email || !birth_date) {
-        return response.error(res, 'All fields (name, email, birth_date) are required', 400);
+    // 입력 검증: 최소 하나의 필드가 있어야 함
+    if (!name && !email && !birth_date) {
+        return response.error(res, 'At least one field (name, email, birth_date) is required', 400);
     }
 
     try {
-        await pool.query(
-            'UPDATE members SET name = ?, email = ?, birth_date = ? WHERE id = ?',
-            [name, email, birth_date, userId]
-        );
+        // members 테이블 업데이트 (필드가 전달된 경우에만 수정)
+        const fieldsToUpdate = [];
+        const values = [];
+
+        if (name) {
+            fieldsToUpdate.push('name = ?');
+            values.push(name);
+        }
+        if (email) {
+            fieldsToUpdate.push('email = ?');
+            values.push(email);
+        }
+        if (birth_date) {
+            fieldsToUpdate.push('birth_date = ?');
+            values.push(birth_date);
+        }
+
+        values.push(userId);
+
+        const query = `UPDATE members SET ${fieldsToUpdate.join(', ')} WHERE id = ?`;
+        await pool.query(query, values);
 
         return response.success(res, 'User profile updated successfully');
     } catch (error) {
         console.error('Error updating user profile:', error);
         return response.error(res, 'Failed to update user profile', 500);
+    }
+};
+
+// 로그아웃 처리
+exports.logout = async (req, res) => {
+    try {
+        // 클라이언트 측에서 JWT 토큰을 삭제하도록 안내
+        return response.success(res, 'Logout successful');
+    } catch (error) {
+        console.error('Error during logout:', error);
+        return response.error(res, 'Failed to log out', 500);
     }
 };
