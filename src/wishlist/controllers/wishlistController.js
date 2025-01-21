@@ -5,11 +5,12 @@ const pool = require('../../../config/database');
 // 선물 추가
 exports.addWishlist = async (req, res) => {
     const memberId = req.user.id; // JWT에서 인증된 사용자 ID
-    const { title, image, price, link, description } = req.body;
+    const { title, price, link, description } = req.body;
+    const image = req.file ? `/uploads/images/${req.file.filename}` : null; // 이미지 경로
 
     try {
-       const wishlist = await wishlistService.addWishlist({ memberId, title, image, price, link, description });
-       return response.success(res, 'Wishlist created successfully', wishlist);
+        const wishlist = await wishlistService.addWishlist({ memberId, title, image, price, link, description });
+        return response.success(res, 'Wishlist created successfully', wishlist);
     } catch (error) {
         console.error('Error adding wishlist:', error);
         return response.error(res, 'Failed to add wishlist', 500);
@@ -20,9 +21,10 @@ exports.addWishlist = async (req, res) => {
 exports.updateWishlist = async (req, res) => {
     const { gift_id } = req.params;
     const { link, description } = req.body;
+    const image = req.file ? `/uploads/images/${req.file.filename}` : null; // 이미지 경로
 
     try {
-        const updatedWishlist = await wishlistService.updateWishlist(gift_id, { link, description });
+        const updatedWishlist = await wishlistService.updateWishlist(gift_id, { link, description, image });
         if (!updatedWishlist) {
             return response.error(res, 'Wishlist not found', 404);
         }

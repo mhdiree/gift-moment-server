@@ -2,12 +2,13 @@ const express = require('express');
 const wishlistController = require('../controllers/wishlistController');
 const authenticate = require('../../auth/middleware/authenticate');
 const router = express.Router();
+const upload = require('../../../config/multer');
 
 // 선물 추가
-router.post('/', authenticate, wishlistController.addWishlist);
+router.post('/', authenticate, upload.single('image'), wishlistController.addWishlist);
 
 // 선물 수정
-router.patch('/:gift_id', wishlistController.updateWishlist);
+router.patch('/:gift_id', authenticate, upload.single('image'), wishlistController.updateWishlist);
 
 // 선물 삭제
 router.delete('/:gift_id', wishlistController.deleteWishlist);
