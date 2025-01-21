@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const cors = require('cors');
 const paymentRoutes = require('./src/payments/routes/payment.routes');
 const letterRoutes = require('./src/letters/routes/letter.routes');
 const authRoutes = require('./src/auth/routes/authRoutes');
@@ -9,6 +10,13 @@ const mypageRoutes = require('./src/mypage/routes/mypageRoutes');
 const wishlistRoutes = require('./src/wishlist/routes/wishlistRoutes');
 
 const app = express();
+
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://13.209.98.232:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']  // JWT 토큰 전송을 위해 필요
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
