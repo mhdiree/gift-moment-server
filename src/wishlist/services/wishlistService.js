@@ -2,20 +2,17 @@ const pool = require('../../../config/database');
 
 // 선물 추가
 exports.addWishlist = async ({ memberId, title, image, price, link, description }) => {
-    // 먼저 해당 member_id가 이미 보유한 선물 수를 확인
+    // 회원이 보유한 선물 수 확인
     const [existingGifts] = await pool.query(
-        `SELECT COUNT(*) AS count 
-         FROM gift 
-         WHERE member_id = ?`,
+        `SELECT COUNT(*) AS count FROM gift WHERE member_id = ?`,
         [memberId]
     );
 
-    // 선물이 5개 이상이면 새로운 선물을 추가할 수 없음
     if (existingGifts[0].count >= 5) {
         throw new Error("A member can have a maximum of 5 gifts");
     }
 
-    // 선물 추가
+    // 선물 데이터 추가
     const [result] = await pool.query(
         `INSERT INTO gift (member_id, title, image, price, link, description, target_amount, current_amount, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
@@ -24,7 +21,6 @@ exports.addWishlist = async ({ memberId, title, image, price, link, description 
 
     return { id: result.insertId, memberId, title, image, price, link, description };
 };
-
 
 exports.getWishlistById = async (wishlistId) => {
     const [rows] = await pool.query(
@@ -35,48 +31,53 @@ exports.getWishlistById = async (wishlistId) => {
 };
 
 // 선물 수정
-exports.updateWishlist = async (giftId, { link, description }) => {
-    // 수정할 값들이 있으면 쿼리 수행
+exports.updateWishlist = async (giftId, { link, description, image }) => {
     const updateFields = [];
     const queryParams = [];
 
-    // link 값이 있으면 updateFields와 queryParams에 추가
+    // link 값 추가
     if (link !== undefined) {
         updateFields.push("link = ?");
         queryParams.push(link);
     }
 
-    // description 값이 있으면 updateFields와 queryParams에 추가
+    // description 값 추가
     if (description !== undefined) {
         updateFields.push("description = ?");
         queryParams.push(description);
     }
 
-    // 쿼리 필드가 없으면 수정하지 않음
+    // image 값 추가
+    if (image !== undefined) {
+        updateFields.push("image = ?");
+        queryParams.push(image);
+    }
+
+    // 수정할 값이 없으면 null 반환
     if (updateFields.length === 0) {
         return null;
     }
 
-    // 추가된 값들로 쿼리 작성
+    // SQL 쿼리 작성
     const query = `
         UPDATE gift
         SET ${updateFields.join(', ')}, updated_at = NOW()
         WHERE id = ?
     `;
 
-    queryParams.push(giftId);  // 마지막으로 giftId 추가
+    queryParams.push(giftId); // 마지막으로 giftId 추가
 
     // 쿼리 실행
     const [result] = await pool.query(query, queryParams);
 
-    // 수정된 행이 없다면 null 반환 (선물 ID가 없을 때)
+    // 수정된 행이 없으면 null 반환
     if (result.affectedRows === 0) {
         return null;
     }
-    
+
+    // 성공적으로 수정된 경우
     return {};
 };
-
 
 // 선물 삭제
 exports.deleteWishlist = async (giftId) => {
