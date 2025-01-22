@@ -1,3 +1,4 @@
+const jwtUtil = require('../../auth/utils/jwt')
 const db = require('../../../config/database');
 
 //편지 작성
@@ -15,10 +16,12 @@ const createLetter = async ({ recipient_id, sender_name, content, wishlist_id })
 };
 
 //편지 목록 조회(로그인)
-const getLettersForLoggedInUser = async (recipientId, userId) => {
+const getLettersForLoggedInUser = async (accessToken, userId) => {
     const connection = await db.getConnection();
     try{
-        const [birthdayResult] = await connection.query(
+        const recipientId = jwtUtil.verifyToken(accessToken).id;
+
+        const [birthdayResult] = await connection.query( //생일 확인인
             `SELECT DATE(NOW()) > birth_date AS is_after_birthday FROM members WHERE id = ?`,
             [recipientId]
         );
