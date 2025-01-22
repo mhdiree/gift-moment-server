@@ -21,8 +21,8 @@ exports.addAccount = async (req, res) => {
 
         // 계좌 정보 삽입
         await pool.query(
-            'INSERT INTO member_accounts (member_id, bank_code, account_number, account_holder) VALUES (?, ?, ?, ?)',
-            [userId, bank_code, account_number, accountHolder]
+            'INSERT INTO member_accounts (member_id, bank_code, account_number) VALUES (?, ?, ?)',
+            [userId, bank_code, account_number]
         );
 
         return response.success(res, 'Account added successfully');

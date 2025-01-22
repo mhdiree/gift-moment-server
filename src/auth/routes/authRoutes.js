@@ -7,12 +7,15 @@ const authenticate = require('../middleware/authenticate'); // JWT 인증 미들
 router.post('/auth/kakao', authController.kakaoLogin);
 
 // 사용자 프로필 조회
-router.get('/profile', authenticate, authController.getUserProfile);
+router.get('/auth/profile', authenticate, authController.getUserProfile);
 
 // 사용자 프로필 업데이트
-router.post('/profile', authenticate, authController.updateUserProfile);
+router.patch('/auth/profile', authenticate, authController.updateUserProfile);
 
 // 회원 이름 및 생일 정보 반환
-router.get('/navigate', authenticate, authController.getUserNameAndBirthday);
+router.get('/auth/navigate', authenticate, authController.getUserNameAndBirthday);
+
+// 로그아웃 엔드포인트
+router.post('/auth/logout', authenticate, authController.logout);
 
 module.exports = router;
