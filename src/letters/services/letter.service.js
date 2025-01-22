@@ -19,7 +19,7 @@ const getLettersForLoggedInUser = async (recipientId, userId) => {
     const connection = await db.getConnection();
     try{
         const [birthdayResult] = await connection.query(
-            `SELECT DATE(NOW()) > birthday AS is_after_birthday FROM users WHERE id = ?`,
+            `SELECT DATE(NOW()) > birth_date AS is_after_birthday FROM members WHERE id = ?`,
             [recipientId]
         );
         const [letters] = await connection.query(
@@ -58,27 +58,25 @@ const getLetterDetails = async (recipientId, letterId, userId) => {
     }
 };
 
-const getLettersForGuest = async (accessLink) => {
+const getLettersForGuest = async (recipientId) => {
     const connection = await db.getConnection();
     try {
-        // 접속 링크의 주인 확인
+        // recipient_id를 기반으로 생일자 이름 확인
         const [userResult] = await connection.query(
-            `SELECT name FROM users WHERE access_link = ?`,
-            [accessLink]
+            `SELECT name FROM users WHERE id = ?`,
+            [recipientId]
         );
 
         if (userResult.length === 0) {
-            throw new Error('Invalid access link or user not found');
+            throw new Error('Recipient not found');
         }
 
         const birthdayOwnerName = userResult[0].name;
 
         // 해당 유저의 편지 개수 확인
         const [letterCountResult] = await connection.query(
-            `SELECT COUNT(*) AS total_letters FROM letters WHERE recipient_id = (
-                SELECT id FROM users WHERE access_link = ?
-            )`,
-            [accessLink]
+            `SELECT COUNT(*) AS total_letters FROM letters WHERE recipient_id = ?`,
+            [recipientId]
         );
 
         return {
