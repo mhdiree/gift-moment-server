@@ -1,33 +1,34 @@
 const pool = require('../../../config/database');
+const { deleteImageFromS3 } = require('../../auth/utils/upload');
 
 // 선물 추가
 exports.addWishlist = async ({ memberId, title, image, price, link, description }) => {
     // 회원이 보유한 선물 수 확인
     const [existingGifts] = await pool.query(
-        `SELECT COUNT(*) AS count FROM gift WHERE member_id = ?`,
+        'SELECT COUNT(*) AS count FROM gift WHERE member_id = ?',
         [memberId]
     );
 
     if (existingGifts[0].count >= 5) {
-        throw new Error("A member can have a maximum of 5 gifts");
+        throw new Error("A member can have a maximum of 5 gifts"); // 5개 초과 시 에러
     }
 
     // 선물 데이터 추가
     const [result] = await pool.query(
-        `INSERT INTO gift (member_id, title, image, price, link, description, target_amount, current_amount, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
+        'INSERT INTO gift (member_id, title, image, price, link, description, target_amount, current_amount, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())',
         [memberId, title, image, price, link, description, price]
     );
 
-    return { id: result.insertId, memberId, title, image, price, link, description };
-};
-
-exports.getWishlistById = async (wishlistId) => {
-    const [rows] = await pool.query(
-        `SELECT title, image, price, link, description FROM gift WHERE id = ?`,
-        [wishlistId]
-    );
-    return rows[0] || null;
+    // 추가된 선물 반환
+    return {
+        id: result.insertId,
+        memberId,
+        title,
+        image,
+        price,
+        link,
+        description,
+    };
 };
 
 // 선물 수정
@@ -59,12 +60,9 @@ exports.updateWishlist = async (giftId, { link, description, image }) => {
     }
 
     // SQL 쿼리 작성
-    const query = `
-        UPDATE gift
-        SET ${updateFields.join(', ')}, updated_at = NOW()
-        WHERE id = ?
-    `;
-
+    const query = 
+        'UPDATE gift SET ' + updateFields.join(', ') + ', updated_at = NOW() WHERE id = ?';
+    
     queryParams.push(giftId); // 마지막으로 giftId 추가
 
     // 쿼리 실행
@@ -75,18 +73,111 @@ exports.updateWishlist = async (giftId, { link, description, image }) => {
         return null;
     }
 
-    // 성공적으로 수정된 경우
-    return {};
+    // 수정된 선물 데이터 반환
+    const [updatedGift] = await pool.query(
+        'SELECT * FROM gift WHERE id = ?',
+        [giftId]
+    );
+
+    return {}
 };
 
 // 선물 삭제
 exports.deleteWishlist = async (giftId) => {
-    const [result] = await pool.query(`DELETE FROM gift WHERE id = ?`, [giftId]);
+    const wishlist = await this.getWishlistById(giftId);
+
+    if (wishlist && wishlist.image) {
+        await deleteImageFromS3(wishlist.image); // 이미지 삭제
+    }
+
+    const [result] = await pool.query('DELETE FROM gift WHERE id = ?', [giftId]);
     return result.affectedRows > 0;
 };
+// 선물 조회 함수
+exports.getWishlistById = async (giftId) => {
+    const [gift] = await pool.query('SELECT * FROM gift WHERE id = ?', [giftId]);
+    return gift[0]; // 선물 반환
+};
 
-// 특정 선물 조회
-exports.getGiftDetailsForWishlist = async (gift_id) => {
+// 특정 선물 조회-생일자
+exports.getGiftDetailsForWishlistByMember = async (gift_id, memberId) => {
+    try {
+        // 선물 정보 가져오기
+        const [gift] = await pool.query(
+            `SELECT g.id, g.title, g.image, g.price, g.link, g.description, 
+                    m.name, DATE_FORMAT(m.birth_date, '%m\uC6D4 %d\uC77C') AS birth, 
+                    g.member_id, m.birth_date
+             FROM gift g
+             JOIN members m ON g.member_id = m.id
+             WHERE g.id = ? AND g.member_id = ?`,  // 선물 소유자(member_id)가 로그인한 사용자와 일치해야 함
+            [gift_id, memberId]
+        );
+
+        if (gift.length === 0) {
+            throw new Error("Gift not found or access denied");
+        }
+
+        const giftData = gift[0];
+
+        // 결제 정보 가져오기
+        const [payments] = await pool.query(
+            `SELECT p.id AS payment_id, p.amount, m.name
+             FROM payments p
+             JOIN members m ON p.member_id = m.id
+             WHERE p.gift_id = ?`,
+            [gift_id]
+        );
+
+        // 결제 정보 가공 (가격과 결제 금액을 정수로 변환)
+        const paymentDetails = payments.map(payment => ({
+            name: payment.name,
+            amount: Math.floor(payment.amount),  // 소수점 없이 정수로 반환
+            payment_id: payment.payment_id,
+        }));
+
+        // 생일을 기준으로 D-day 계산
+        const today = new Date();
+        const birthDate = new Date(giftData.birth_date);
+
+        // 생일을 현재 연도로 변경 (이미 지났다면 내년 생일로 설정)
+        birthDate.setFullYear(today.getFullYear());
+        if (birthDate < today) {
+            birthDate.setFullYear(today.getFullYear() + 1);
+        }
+
+        // D-day 계산
+        const timeDiff = birthDate.getTime() - today.getTime();
+        let dday = Math.ceil(timeDiff / (1000 * 3600 * 24));  // D-day 계산
+
+        // D-day가 0이거나 365일인 경우 "day"로 설정
+        if (dday === 0 || dday === 365) {
+            dday = "day";
+        }
+
+        // 반환할 데이터 구성 (가격을 소수점 없이 정수로 반환)
+        return {
+            name: giftData.name,
+            birth: giftData.birth,
+            dday: dday,
+            member_id: giftData.member_id,
+            gift: {
+                id: giftData.id,
+                title: giftData.title,
+                image: giftData.image,  // S3 URL로 반환
+                price: Math.floor(giftData.price),  // 가격을 정수로 반환
+                link: giftData.link,
+                description: giftData.description,
+                payments: paymentDetails,
+            }
+        };
+    } catch (error) {
+        console.error("Error in getGiftDetailsForWishlistByMember:", error);
+        throw error;
+    }
+};
+
+// 특정 선물 조회-선물 주는 사람
+exports.getGiftDetailsForWishlistByGiver = async (gift_id) => {
     try {
         // 선물 정보 가져오기
         const [gift] = await pool.query(
@@ -107,7 +198,7 @@ exports.getGiftDetailsForWishlist = async (gift_id) => {
 
         // 결제 정보 가져오기
         const [payments] = await pool.query(
-            `SELECT p.id AS payment_id, p.amount, m.name
+            `SELECT p.id AS payment_id, m.name, p.amount
              FROM payments p
              JOIN members m ON p.member_id = m.id
              WHERE p.gift_id = ?`,
@@ -117,8 +208,6 @@ exports.getGiftDetailsForWishlist = async (gift_id) => {
         // 결제 정보에 percentage 추가
         const paymentDetails = payments.map(payment => ({
             name: payment.name,
-            amount: parseFloat(payment.amount).toFixed(2),
-            payment_id: payment.payment_id,
             percentage: giftData.price > 0 ? Math.floor((parseFloat(payment.amount) / parseFloat(giftData.price)) * 100) : 0,
         }));
 
@@ -141,7 +230,7 @@ exports.getGiftDetailsForWishlist = async (gift_id) => {
             dday = "day";
         }
 
-        // 반환할 데이터 구성
+        // 반환할 데이터 구성 (price를 정수로 변환)
         return {
             name: giftData.name,
             birth: giftData.birth,
@@ -151,14 +240,14 @@ exports.getGiftDetailsForWishlist = async (gift_id) => {
                 id: giftData.id,
                 title: giftData.title,
                 image: giftData.image,
-                price: parseFloat(giftData.price).toFixed(2),
+                price: Math.floor(giftData.price), // 소수점 없이 정수 반환
                 link: giftData.link,
                 description: giftData.description,
                 payments: paymentDetails,
             }
         };
     } catch (error) {
-        console.error("Error in getGiftDetailsForWishlist:", error);
+        console.error("Error in getGiftDetailsForWishlistByGiver:", error);
         throw error;
     }
 };
@@ -214,7 +303,7 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
                     id: gift.id,
                     title: gift.title,
                     image: gift.image,
-                    percent: percent.toFixed(0),  // 백분율을 정수로 설정
+                    percent: Math.floor(percent.toFixed(0)),  // 백분율을 정수로 설정
                     state: state
                 };
             })
