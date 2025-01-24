@@ -7,7 +7,7 @@ const router = express.Router();
 router.post('/letters', letterController.createLetter);
 
 // 편지 목록 조회 (로그인 상태)
-router.get('/letters:token', authMiddleware, letterController.getLettersForLoggedInUser);
+router.get('/letters', authMiddleware, letterController.getLettersForLoggedInUser);
 
 // 편지 상세 조회 (로그인 상태)
 router.get('/letters/:letter_id', authMiddleware, letterController.getLetterDetails);
