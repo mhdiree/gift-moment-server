@@ -34,7 +34,7 @@ const createLetter = async ({ sender_name, to, content, recipient_id }) => {
 
     // 편지 저장
     await connection.query(
-      `INSERT INTO letters (sender_name, \`to\`, content, recipient_id, created_at)
+      `INSERT INTO letters (sender_name, recipient_to, content, recipient_id, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
       [sender_name, to, content, recipient_id]
     );
@@ -85,7 +85,7 @@ const getLetterDetails = async (recipientId, letterId) => {
   const connection = await db.getConnection();
   try {
     const [letter] = await connection.query(
-      `SELECT id, \`to\`, sender_name, content, created_at 
+      `SELECT id, recipient_to, sender_name, content, created_at 
        FROM letters 
        WHERE recipient_id = ? AND id = ?`,
       [recipientId, letterId]
