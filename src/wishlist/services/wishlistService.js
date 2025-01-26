@@ -36,6 +36,19 @@ exports.updateWishlist = async (giftId, { link, description, image }) => {
     const updateFields = [];
     const queryParams = [];
 
+    // 기존 데이터를 조회하여 기본값 확보
+    const [existingGiftRows] = await pool.query(
+        'SELECT * FROM gift WHERE id = ?',
+        [giftId]
+    );
+
+    if (existingGiftRows.length === 0) {
+        return null; // giftId가 잘못된 경우
+    }
+
+    const existingGift = existingGiftRows[0]; // 기존 데이터의 첫 번째 행
+    const existingImage = existingGift.image; // 기존 image 값 저장
+
     // link 값 추가
     if (link !== undefined) {
         updateFields.push("link = ?");
@@ -48,10 +61,14 @@ exports.updateWishlist = async (giftId, { link, description, image }) => {
         queryParams.push(description);
     }
 
-    // image 값 추가
-    if (image !== undefined) {
+    // image 값 처리: null인지, undefined인지 확인
+    if (image !== undefined && image !== null) {
         updateFields.push("image = ?");
         queryParams.push(image);
+    } else if (image === undefined && image === null) {
+        // image 값이 없으면 기존 값 유지
+        updateFields.push("image = ?");
+        queryParams.push(existingImage);
     }
 
     // 수정할 값이 없으면 null 반환
@@ -74,12 +91,12 @@ exports.updateWishlist = async (giftId, { link, description, image }) => {
     }
 
     // 수정된 선물 데이터 반환
-    const [updatedGift] = await pool.query(
+    const [updatedGiftRows] = await pool.query(
         'SELECT * FROM gift WHERE id = ?',
         [giftId]
     );
 
-    return {}
+    return updatedGiftRows.length > 0 ? updatedGiftRows[0] : null;
 };
 
 // 선물 삭제
