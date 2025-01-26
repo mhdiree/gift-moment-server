@@ -265,11 +265,18 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
             [member_id]
         );
 
-        if (gifts.length === 0) {
-            throw new Error("The member has no gifts");
-        }
+        const member = gifts.length > 0 ? gifts[0] : null; // 회원 정보 (선물 데이터에서 첫 번째로 가져오기)
 
-        const member = gifts[0]; // 회원 정보 (선물 데이터에서 첫 번째로 가져오기)
+        if (!member) {
+            return [{
+                name: "회원 정보 없음",
+                birth: "N/A",
+                dday: "N/A",
+                member_id: member_id,
+                before_birthday: false,
+                gift: []
+            }];
+        }
 
         const wishlist = await Promise.all(
             gifts.map(async (gift) => {
@@ -281,10 +288,8 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
                     [gift.id]
                 );
 
-                // 합산된 금액을 현재 금액(current_amount)로 업데이트
                 const current_amount = paymentData[0]?.total_amount || 0;
 
-                // 선물의 current_amount 칼럼 업데이트
                 await pool.query(
                     `UPDATE gift 
                      SET current_amount = ? 
@@ -292,60 +297,50 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
                     [current_amount, gift.id]
                 );
 
-                // percent 계산
                 const percent = (current_amount / gift.target_amount) * 100;
-
-                // 선물 상태 결정
                 const state = percent >= 100 ? '완료' : '진행 중';
 
-                // 선물에 대한 상세 정보를 포함한 객체 반환
                 return {
                     id: gift.id,
                     title: gift.title,
                     image: gift.image,
-                    percent: Math.floor(percent.toFixed(0)),  // 백분율을 정수로 설정
+                    percent: Math.floor(percent.toFixed(0)),
                     state: state
                 };
             })
         );
 
-        // 생일을 기준으로 D-day 계산
         const today = new Date();
-        const birthDate = new Date(member.birth_date); // 회원의 생일
+        const birthDate = new Date(member.birth_date); 
         
-        // 생일을 현재 연도로 변경 (만약 이미 지나면 내년 생일로 설정)
         birthDate.setFullYear(today.getFullYear());
 
-        // 생일이 오늘인 경우
         if (birthDate.toDateString() === today.toDateString()) {
             return [{
                 name: member.name,
                 birth: member.birth,
-                dday: "day",  // 생일 당일은 "day"로 설정
+                dday: "day",  
                 member_id: member.member_id,
-                before_birthday: false,  // 생일 당일은 before_birthday false
+                before_birthday: false,  
                 gift: wishlist
             }];
         }
-        // 생일이 이미 지나면 내년 생일로 설정
+
         if (birthDate < today) {
             birthDate.setFullYear(today.getFullYear() + 1);
         }
         
-        // D-day 계산
         const timeDiff = birthDate.getTime() - today.getTime();
-        const dday = Math.ceil(timeDiff / (1000 * 3600 * 24)); // D-day 계산
-        
-        // 생일 전후 판단
-        const beforeBirthday = dday > 0;  // 생일 전후를 boolean으로 반환
-        
-        // 반환되는 데이터 포맷에 맞춰서 구성
+        const dday = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+        const beforeBirthday = dday > 0;  
+
         return [{
             name: member.name,
             birth: member.birth,
-            dday: dday,  // D-day가 0이면 "day"로 반환
+            dday: dday,  
             member_id: member.member_id,
-            before_birthday: beforeBirthday,  // 생일 전후를 boolean으로 반환
+            before_birthday: beforeBirthday,  
             gift: wishlist
         }];
     } catch (error) {
@@ -361,16 +356,20 @@ exports.getWishlistForMember = async (member_id) => {
                 g.id AS gift_id, g.title, g.image,
                 m.birth_date
          FROM members m
-         JOIN gift g ON m.id = g.member_id
+         LEFT JOIN gift g ON m.id = g.member_id
          WHERE m.id = ?`,
         [member_id]
     );
 
     if (rows.length === 0) {
-        return null;
+        return {
+            name: "회원 정보 없음",
+            birth: "N/A",
+            dday: "N/A",
+            gift: []
+        };
     }
 
-    // 생일 계산 (D-day)
     const birthDate = new Date(rows[0].birth_date);
     const today = new Date();
     const currentYear = today.getFullYear();
@@ -380,11 +379,10 @@ exports.getWishlistForMember = async (member_id) => {
 
     let dday;
     if (diffDays === 0) {
-        dday = 'day'; // 생일 당일
+        dday = 'day'; 
     } else if (diffDays > 0) {
-        dday = diffDays; // 생일 전
+        dday = diffDays; 
     } else {
-        // 생일이 지나간 경우 내년 생일까지의 D-day 계산
         const nextYearBirthday = new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate());
         const nextDiffTime = nextYearBirthday - today;
         dday = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24));
@@ -394,10 +392,10 @@ exports.getWishlistForMember = async (member_id) => {
         name: rows[0].name,
         birth: rows[0].birth,
         dday: dday,
-        gift: rows.map(row => ({
+        gift: rows.length > 0 ? rows.map(row => ({
             id: row.gift_id,
             title: row.title,
             image: row.image
-        }))
+        })) : []
     };
 };
