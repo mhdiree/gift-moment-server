@@ -1,21 +1,17 @@
 const db = require('../../../config/database');
 const jwtUtil = require('../../auth/utils/jwt');
 const { ERROR_MESSAGES } = require('../../common/errors/error.constants');
+const crypto = require('crypto');
 
 // 편지 작성
-const createLetter = async ({ to, sender_name, content, accessToken }) => {
+const createLetter = async ({ sender_name, to, content, recipient_id,}) => {
   const connection = await db.getConnection();
   try {
-    // 토큰 검증 및 발신자 ID 추출
-    const decodedToken = jwtUtil.verifyToken(accessToken);
-    const senderId = decodedToken.id;
-
     // 수신자 ID 확인
     const [recipientResult] = await connection.query(
       'SELECT id FROM members WHERE name = ?',
-      [to]
+      [recipient_id]
     );
-
     if (recipientResult.length === 0) {
       throw new Error('Recipient not found');
     }
@@ -24,9 +20,9 @@ const createLetter = async ({ to, sender_name, content, accessToken }) => {
 
     // 편지 저장
     await connection.query(
-      `INSERT INTO letters (recipient_id, sender_id, sender_name, content, created_at)
+      `INSERT INTO letters (sender_name, to, content, recipient_id, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
-      [recipientId, senderId, sender_name, content]
+      [sender_name, to, content, recipient_id]
     );
   } catch (error) {
     console.error('Error in createLetter:', error.message);
@@ -37,15 +33,34 @@ const createLetter = async ({ to, sender_name, content, accessToken }) => {
 };
 
 // 편지 목록 조회 (로그인 상태)
-const getLettersForLoggedInUser = async (userId) => {
+const getLettersForLoggedInUser = async (recipientId) => {
   const connection = await db.getConnection();
   try {
+    // 사용자 이름과 생일 조회
+    const [userResult] = await connection.query(
+      'SELECT name, birth_date FROM members WHERE id = ?',
+      [recipientId]
+    );
+    if (!userResult.length) {
+      throw new Error('Recipient not found');
+    }
+    const { name, birth_date } = userResult[0];
+    // 현재 날짜와 비교하여 생일 전후 여부 결정
+    const currentDate = new Date();
+    const birthDate = new Date(birth_date); // 생일 날짜를 Date 객체로 변환
+
+    // 생일이 아직 지나지 않았으면 true, 지나면 false
+    const beforeBirthday = currentDate.getMonth() < birthDate.getMonth() ||
+                           (currentDate.getMonth() === birthDate.getMonth() && currentDate.getDate() < birthDate.getDate());
+
     const [letters] = await connection.query(
-      'SELECT id, sender_name, content, created_at FROM letters WHERE recipient_id = ?',
-      [userId]
+      'SELECT * FROM letters WHERE recipient_id = ?',
+      [recipientId]
     );
 
     return {
+      username: name,
+      before_birthday: beforeBirthday,
       total_letters: letters.length,
       letters,
     };
@@ -62,7 +77,7 @@ const getLetterDetails = async (recipientId, letterId) => {
   const connection = await db.getConnection();
   try {
     const [letter] = await connection.query(
-      `SELECT id, sender_name, content, created_at 
+      `SELECT id, to, sender_name, content, created_at 
        FROM letters 
        WHERE recipient_id = ? AND id = ?`,
       [recipientId, letterId]
@@ -81,7 +96,7 @@ const getLetterDetails = async (recipientId, letterId) => {
   }
 };
 
-// 손님용 편지 목록 조회
+// 편지 목록 조회 (로그인 X)
 const getLettersForGuest = async (recipientId) => {
   const connection = await db.getConnection();
   try {
@@ -111,9 +126,21 @@ const getLettersForGuest = async (recipientId) => {
   }
 };
 
+// 랜덤 문자열 생성 함수 (8자리)
+const generateRandomString = (length = 8) => {
+  return crypto.randomBytes(length).toString('hex');  // 16진수 문자열 생성
+};
+
+// 고유한 링크 생성 함수
+const createLetterLink = () => {
+  const randomId = generateRandomString(8);  // 8자리 랜덤 문자열 생성
+  return `/gm-letter/${randomId}`;  // 예시 링크: /gm-letter/aj8b1394
+};
+
 module.exports = {
   createLetter,
   getLettersForLoggedInUser,
   getLetterDetails,
   getLettersForGuest,
+  createLetterLink
 };

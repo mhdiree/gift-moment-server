@@ -5,20 +5,7 @@ const { ERROR_MESSAGES } = require('../../common/errors/error.constants');
 // 편지 작성
 const createLetter = async (req, res) => {
   try {
-    const { to, sender_name, content } = req.body;
-
-    // Authorization 헤더에서 토큰 추출
-    const accessToken = req.headers.authorization?.split(' ')[1];
-    if (!accessToken) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Access token is required',
-        data: null,
-      });
-    }
-
-    // 토큰 검증 및 로그인 사용자 정보 추출
-    const decodedToken = jwtUtil.verifyToken(accessToken);
+    const { to, sender_name, content, recipient_id } = req.body;
 
     // content 길이 검사
     if (!content || content.length > 500) {
@@ -34,7 +21,7 @@ const createLetter = async (req, res) => {
       sender_name,
       to,
       content,
-      accessToken,
+      recipient_id,
     });
 
     res.status(201).json({
@@ -137,9 +124,26 @@ const getLettersForGuest = async (req, res) => {
   }
 };
 
+const generateLetterLink = (req, res) => {
+  try{
+    const letterCopyUrl = letterService.createLetterLink();
+
+    res.status(200).json({ letter_copy_url: letterCopyUrl });
+    
+  }catch (error) {
+    console.error('Error in generateLetterLink:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: ERROR_MESSAGES.COMMON.SERVER_ERROR,
+      data: null,
+    });
+  }
+}
+
 module.exports = {
   createLetter,
   getLettersForLoggedInUser,
   getLetterDetails,
   getLettersForGuest,
+  generateLetterLink
 };
