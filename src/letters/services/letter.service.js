@@ -3,8 +3,22 @@ const jwtUtil = require('../../auth/utils/jwt');
 const { ERROR_MESSAGES } = require('../../common/errors/error.constants');
 const crypto = require('crypto');
 
+// 사용자 정보 조회 함수 (중복 제거)
+const getUserInfo = async (recipientId) => {
+  const connection = await db.getConnection();
+  const [userResult] = await connection.query(
+    'SELECT name, birth_date FROM members WHERE id = ?',
+    [recipientId]
+  );
+  connection.release();
+  if (!userResult.length) {
+    throw new Error('Recipient not found');
+  }
+  return userResult[0];
+};
+
 // 편지 작성
-const createLetter = async ({ sender_name, to, content, recipient_id,}) => {
+const createLetter = async ({ sender_name, to, content, recipient_id }) => {
   const connection = await db.getConnection();
   try {
     // 수신자 ID 확인
@@ -20,7 +34,7 @@ const createLetter = async ({ sender_name, to, content, recipient_id,}) => {
 
     // 편지 저장
     await connection.query(
-      `INSERT INTO letters (sender_name, to, content, recipient_id, created_at)
+      `INSERT INTO letters (sender_name, \`to\`, content, recipient_id, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
       [sender_name, to, content, recipient_id]
     );
@@ -37,14 +51,8 @@ const getLettersForLoggedInUser = async (recipientId) => {
   const connection = await db.getConnection();
   try {
     // 사용자 이름과 생일 조회
-    const [userResult] = await connection.query(
-      'SELECT name, birth_date FROM members WHERE id = ?',
-      [recipientId]
-    );
-    if (!userResult.length) {
-      throw new Error('Recipient not found');
-    }
-    const { name, birth_date } = userResult[0];
+    const { name, birth_date } = await getUserInfo(recipientId);
+
     // 현재 날짜와 비교하여 생일 전후 여부 결정
     const currentDate = new Date();
     const birthDate = new Date(birth_date); // 생일 날짜를 Date 객체로 변환
@@ -77,7 +85,7 @@ const getLetterDetails = async (recipientId, letterId) => {
   const connection = await db.getConnection();
   try {
     const [letter] = await connection.query(
-      `SELECT id, to, sender_name, content, created_at 
+      `SELECT id, \`to\`, sender_name, content, created_at 
        FROM letters 
        WHERE recipient_id = ? AND id = ?`,
       [recipientId, letterId]
@@ -100,14 +108,16 @@ const getLetterDetails = async (recipientId, letterId) => {
 const getLettersForGuest = async (recipientId) => {
   const connection = await db.getConnection();
   try {
-    const [userResult] = await connection.query(
-      'SELECT name FROM memers WHERE id = ?',
-      [recipientId]
-    );
+    // 사용자 이름과 생일 조회
+    const { name, birth_date } = await getUserInfo(recipientId);
 
-    if (!userResult.length) {
-      throw new Error('Recipient not found');
-    }
+    // 현재 날짜와 비교하여 생일 전후 여부 결정
+    const currentDate = new Date();
+    const birthDate = new Date(birth_date); // 생일 날짜를 Date 객체로 변환
+
+    // 생일이 아직 지나지 않았으면 true, 지나면 false
+    const beforeBirthday = currentDate.getMonth() < birthDate.getMonth() ||
+                           (currentDate.getMonth() === birthDate.getMonth() && currentDate.getDate() < birthDate.getDate());
 
     const [letters] = await connection.query(
       'SELECT COUNT(*) AS total_letters FROM letters WHERE recipient_id = ?',
@@ -115,7 +125,8 @@ const getLettersForGuest = async (recipientId) => {
     );
 
     return {
-      birthday_owner_name: userResult[0].name,
+      birthday_owner_name: name,
+      before_birthday: beforeBirthday,
       total_letters: letters[0].total_letters,
     };
   } catch (error) {
