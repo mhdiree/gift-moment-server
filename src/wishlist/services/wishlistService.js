@@ -255,17 +255,15 @@ exports.getGiftDetailsForWishlistByGiver = async (gift_id) => {
 // 위시리스트 조회-생일자
 exports.getWishlistByBirthday = async (member_id, before_birthday) => {
     try {
-        // 선물 정보와 회원 정보 가져오기
-        const [gifts] = await pool.query(
-            `SELECT g.id, g.title, g.image, g.price, g.link, g.description, g.target_amount, 
-                    m.name, DATE_FORMAT(m.birth_date, '%m\uC6D4 %d\uC77C') AS birth, m.id AS member_id, m.birth_date
-             FROM gift g
-             JOIN members m ON g.member_id = m.id
-             WHERE g.member_id = ?`, 
+        // 회원 정보를 먼저 가져오기
+        const [members] = await pool.query(
+            `SELECT m.name, DATE_FORMAT(m.birth_date, '%m\uC6D4 %d\uC77C') AS birth, m.id AS member_id, m.birth_date
+             FROM members m
+             WHERE m.id = ?`, 
             [member_id]
         );
 
-        const member = gifts.length > 0 ? gifts[0] : null; // 회원 정보 (선물 데이터에서 첫 번째로 가져오기)
+        const member = members.length > 0 ? members[0] : null; // 회원 정보 (선물 데이터에서 첫 번째로 가져오기)
 
         if (!member) {
             return [{
@@ -274,9 +272,17 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
                 dday: "N/A",
                 member_id: member_id,
                 before_birthday: false,
-                gift: []
+                gift: []  // 선물이 없으면 빈 배열 반환
             }];
         }
+
+        // 선물 정보 가져오기
+        const [gifts] = await pool.query(
+            `SELECT g.id, g.title, g.image, g.price, g.link, g.description, g.target_amount 
+             FROM gift g
+             WHERE g.member_id = ?`, 
+            [member_id]
+        );
 
         const wishlist = await Promise.all(
             gifts.map(async (gift) => {
@@ -322,7 +328,7 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
                 dday: "day",  
                 member_id: member.member_id,
                 before_birthday: false,  
-                gift: wishlist
+                gift: wishlist.length > 0 ? wishlist : []  // 선물이 없으면 빈 배열 반환
             }];
         }
 
@@ -341,7 +347,7 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
             dday: dday,  
             member_id: member.member_id,
             before_birthday: beforeBirthday,  
-            gift: wishlist
+            gift: wishlist.length > 0 ? wishlist : []  // 선물이 없으면 빈 배열 반환
         }];
     } catch (error) {
         console.error("Error occurred in getWishlistByBirthday:", error);
@@ -351,51 +357,67 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
 
 // 위시리스트 조회-선물 주는 사람
 exports.getWishlistForMember = async (member_id) => {
-    const [rows] = await pool.query(
-        `SELECT m.name, DATE_FORMAT(m.birth_date, '%m월 %d일') AS birth,
-                g.id AS gift_id, g.title, g.image,
-                m.birth_date
-         FROM members m
-         LEFT JOIN gift g ON m.id = g.member_id
-         WHERE m.id = ?`,
-        [member_id]
-    );
+    try {
+        // 선물 주는 사람 정보 가져오기
+        const [members] = await pool.query(
+            `SELECT m.name, DATE_FORMAT(m.birth_date, '%m월 %d일') AS birth, m.id AS member_id, m.birth_date
+             FROM members m
+             WHERE m.id = ?`, 
+            [member_id]
+        );
 
-    if (rows.length === 0) {
+        const member = members.length > 0 ? members[0] : null; // 회원 정보 (선물 데이터에서 첫 번째로 가져오기)
+
+        if (!member) {
+            return {
+                name: "회원 정보 없음",
+                birth: "N/A",
+                dday: "N/A",
+                gift: []  // 선물이 없으면 빈 배열 반환
+            };
+        }
+
+        // 선물 정보 가져오기
+        const [gifts] = await pool.query(
+            `SELECT g.id AS gift_id, g.title, g.image 
+             FROM gift g
+             WHERE g.member_id = ?`, 
+            [member_id]
+        );
+
+        // 선물이 없으면 빈 배열 반환
+        const giftList = gifts.length > 0 ? gifts.map(gift => ({
+            id: gift.gift_id,
+            title: gift.title,
+            image: gift.image
+        })) : [];
+
+        // 생일 D-day 계산
+        const birthDate = new Date(member.birth_date);
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const nextBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
+        const diffTime = nextBirthday - today;
+        let dday;
+
+        if (diffTime === 0) {
+            dday = 'day';  // 생일 당일
+        } else if (diffTime > 0) {
+            dday = Math.ceil(diffTime / (1000 * 60 * 60 * 24));  // 생일 전
+        } else {
+            const nextYearBirthday = new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate());
+            const nextDiffTime = nextYearBirthday - today;
+            dday = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24));  // 내년 생일로 D-day 계산
+        }
+
         return {
-            name: "회원 정보 없음",
-            birth: "N/A",
-            dday: "N/A",
-            gift: []
+            name: member.name,
+            birth: member.birth,
+            dday: dday,
+            gift: giftList  // 선물이 없으면 빈 배열 반환
         };
+    } catch (error) {
+        console.error("Error occurred in getWishlistForMember:", error);
+        throw error;
     }
-
-    const birthDate = new Date(rows[0].birth_date);
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const nextBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
-    const diffTime = nextBirthday - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    let dday;
-    if (diffDays === 0) {
-        dday = 'day'; 
-    } else if (diffDays > 0) {
-        dday = diffDays; 
-    } else {
-        const nextYearBirthday = new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate());
-        const nextDiffTime = nextYearBirthday - today;
-        dday = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24));
-    }
-
-    return {
-        name: rows[0].name,
-        birth: rows[0].birth,
-        dday: dday,
-        gift: rows.length > 0 ? rows.map(row => ({
-            id: row.gift_id,
-            title: row.title,
-            image: row.image
-        })) : []
-    };
 };
