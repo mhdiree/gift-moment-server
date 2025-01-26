@@ -96,7 +96,7 @@ exports.updateWishlist = async (giftId, { link, description, image }) => {
         [giftId]
     );
 
-    return updatedGiftRows.length > 0 ? updatedGiftRows[0] : null;
+    return [];
 };
 
 // 선물 삭제
