@@ -6,9 +6,8 @@ const response = require('../utils/response');
 
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
 const KAKAO_USER_INFO_URL = 'https://kapi.kakao.com/v2/user/me';
-const KAKAO_CLIENT_ID = process.env.KAKAO_CLIENT_ID;
-const KAKAO_REDIRECT_URI = process.env.KAKAO_REDIRECT_URI;
-const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET;
+const KAKAO_CLIENT_ID = '0d639272f1020a59a49a657790cf7644';
+const KAKAO_REDIRECT_URI = 'http://localhost:5173/oauth/kakao';
 
 // 카카오 로그인 처리
 exports.kakaoLogin = async (req, res) => {
@@ -24,8 +23,7 @@ exports.kakaoLogin = async (req, res) => {
                 grant_type: 'authorization_code',
                 client_id: KAKAO_CLIENT_ID,
                 redirect_uri: KAKAO_REDIRECT_URI,
-                code: code,
-                client_secret: KAKAO_CLIENT_SECRET,
+                code: code
             },
         });
 
