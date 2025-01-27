@@ -18,25 +18,25 @@ const getUserInfo = async (recipientId) => {
 };
 
 // 편지 작성
-const createLetter = async ({ sender_name, recipient_to, content, uniqueString }) => {
+const createLetter = async ({ sender_name, to, content, recipient_id }) => {
   const connection = await db.getConnection();
   try {
-    // 수신자 `letter_link`를 기반으로 `recipient_id` 확인
+    // 수신자 ID 확인
     const [recipientResult] = await connection.query(
-      'SELECT id FROM members WHERE letter_link = ?',
-      [uniqueString]
+      'SELECT id FROM members WHERE name = ?',
+      [recipient_id]
     );
     if (recipientResult.length === 0) {
       throw new Error('Recipient not found');
     }
 
-    const recipient_id = recipientResult[0].id;
+    const recipientId = recipientResult[0].id;
 
     // 편지 저장
     await connection.query(
       `INSERT INTO letters (sender_name, recipient_to, content, recipient_id, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
-      [sender_name, recipient_to, content, recipient_id]
+      [sender_name, to, content, recipient_id]
     );
   } catch (error) {
     console.error('Error in createLetter:', error.message);
@@ -105,21 +105,12 @@ const getLetterDetails = async (recipientId, letterId) => {
 };
 
 // 편지 목록 조회 (로그인 X)
-const getLettersForGuest = async (uniqueString) => {
+const getLettersForGuest = async (recipientId) => {
   const connection = await db.getConnection();
   try {
-    // 수신자 `letter_link`를 기반으로 `recipient_id` 확인
-    const [recipientResult] = await connection.query(
-      'SELECT id FROM members WHERE letter_link = ?',
-      [uniqueString]
-    );
-    if (recipientResult.length === 0) {
-      throw new Error('Recipient not found');
-    }
-    const recipientId = recipientResult[0].id; // id를 추출
     // 사용자 이름과 생일 조회
     const { name, birth_date } = await getUserInfo(recipientId);
-    
+
     // 현재 날짜와 비교하여 생일 전후 여부 결정
     const currentDate = new Date();
     const birthDate = new Date(birth_date); // 생일 날짜를 Date 객체로 변환
@@ -151,41 +142,11 @@ const generateRandomString = (length = 8) => {
   return crypto.randomBytes(length).toString('hex');  // 16진수 문자열 생성
 };
 
-// 고유 링크 생성 및 DB 업데이트 함수
-const createLetterLink = async (userId) => {
-  const connection = await db.getConnection();
-  try {
-    // 사용자 확인
-    const [userResult] = await connection.query(
-      'SELECT id FROM members WHERE id = ?',
-      [userId]
-    );
-
-    if (userResult.length === 0) {
-      throw new Error('User not found');
-    }
-
-    // 고유 랜덤 문자열 생성
-    const uniqueString = generateRandomString(8); // 8자리 랜덤 문자열 생성
-
-    // 고유 링크 생성
-    const letterLink = `/gm-letter/${uniqueString}`;
-
-    // 링크를 DB에 업데이트
-    await connection.query(
-      'UPDATE members SET letter_link = ? WHERE id = ?',
-      [uniqueString, userId]
-    );
-
-    return letterLink;
-  } catch (error) {
-    console.error('Error in createLetterLink:', error.message);
-    throw error;
-  } finally {
-    connection.release();
-  }
+// 고유한 링크 생성 함수
+const createLetterLink = () => {
+  const randomId = generateRandomString(8);  // 8자리 랜덤 문자열 생성
+  return `/gm-letter/${randomId}`;  // 예시 링크: /gm-letter/aj8b1394
 };
-
 
 module.exports = {
   createLetter,
