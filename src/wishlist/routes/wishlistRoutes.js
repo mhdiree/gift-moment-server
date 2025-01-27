@@ -23,6 +23,6 @@ router.get('/:gift_id', wishlistController.getWishlistByGiver);
 router.get('/member/birthday', authenticate, wishlistController.getWishlistByBirthday);
 
 // 위시리스트 조회-선물 주는 사람
-router.get('/giver/:member_id', wishlistController.getWishlistByMemberId);
+router.get('/giver/bylink', wishlistController.getWishlistByLink);
 
 module.exports = router;
