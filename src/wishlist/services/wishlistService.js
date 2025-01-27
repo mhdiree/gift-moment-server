@@ -373,14 +373,14 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
 };
 
 // 위시리스트 조회-선물 주는 사람
-exports.getWishlistByLink = async (letterLink) => {
+exports.getWishlistByLink = async (letter_link) => {
     try {
         // 고유 링크로 회원 정보 가져오기
         const [members] = await pool.query(
             `SELECT id AS member_id, name, DATE_FORMAT(birth_date, '%m월 %d일') AS birth, birth_date
              FROM members
              WHERE letter_link = ?`, 
-            [letterLink]
+            [letter_link]
         );
 
         const member = members.length > 0 ? members[0] : null;

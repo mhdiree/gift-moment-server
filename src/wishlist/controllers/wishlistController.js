@@ -148,6 +148,9 @@ exports.getWishlistByLink = async (req, res) => {
                 data: {}
             });
         }
+        
+        // letter_link 값 확인을 위한 로그 추가
+        console.log('Query executed with letter_link:', letter_link);
 
         // 위시리스트 조회 서비스 호출
         const wishlist = await wishlistService.getWishlistByLink(letter_link);
