@@ -1,19 +1,44 @@
+const axios = require('axios');
 const kakaoService = require('../services/kakaoService');
 const pool = require('../../../config/database');
 const jwtUtil = require('../utils/jwt');
 const response = require('../utils/response');
 
+const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
+const KAKAO_USER_INFO_URL = 'https://kapi.kakao.com/v2/user/me';
+const KAKAO_CLIENT_ID = process.env.KAKAO_CLIENT_ID;
+const KAKAO_REDIRECT_URI = process.env.KAKAO_REDIRECT_URI;
+const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET;
+
 // 카카오 로그인 처리
 exports.kakaoLogin = async (req, res) => {
-    const { accessToken } = req.body; // 클라이언트에서 받은 Kakao Access Token
-    if (!accessToken) {
-        return response.error(res, 'Access token is required', 400);
+    const { code } = req.body; // 클라이언트에서 받은 Kakao 인가 코드
+    if (!code) {
+        return response.error(res, 'Authorization code is required', 400);
     }
 
     try {
-        // 카카오 사용자 정보 가져오기
-        const kakaoUser = await kakaoService.getKakaoUser(accessToken);
+        // 인가 코드를 액세스 토큰으로 교환
+        const tokenResponse = await axios.post(KAKAO_TOKEN_URL, null, {
+            params: {
+                grant_type: 'authorization_code',
+                client_id: KAKAO_CLIENT_ID,
+                redirect_uri: KAKAO_REDIRECT_URI,
+                code: code,
+                client_secret: KAKAO_CLIENT_SECRET,
+            },
+        });
 
+        const { access_token } = tokenResponse.data;
+
+        // 액세스 토큰을 사용하여 카카오 사용자 정보 가져오기
+        const kakaoUserResponse = await axios.get(KAKAO_USER_INFO_URL, {
+            headers: {
+                Authorization: `Bearer ${access_token}`,
+            },
+        });
+
+        const kakaoUser = kakaoUserResponse.data;
         const email = kakaoUser.kakao_account.email;
         const name = kakaoUser.properties.nickname;
         let isExistingUser = false;
