@@ -373,36 +373,30 @@ exports.getWishlistByBirthday = async (member_id, before_birthday) => {
 };
 
 // 위시리스트 조회-선물 주는 사람
-exports.getWishlistForMember = async (member_id) => {
+exports.getWishlistByLink = async (letter_link) => {
     try {
-        // 선물 주는 사람 정보 가져오기
+        // 고유 링크로 회원 정보 가져오기
         const [members] = await pool.query(
-            `SELECT m.name, DATE_FORMAT(m.birth_date, '%m월 %d일') AS birth, m.id AS member_id, m.birth_date
-             FROM members m
-             WHERE m.id = ?`, 
-            [member_id]
+            `SELECT id AS member_id, name, DATE_FORMAT(birth_date, '%m월 %d일') AS birth, birth_date
+             FROM members
+             WHERE letter_link = ?`, 
+            [letter_link]
         );
 
-        const member = members.length > 0 ? members[0] : null; // 회원 정보 (선물 데이터에서 첫 번째로 가져오기)
+        const member = members.length > 0 ? members[0] : null;
 
         if (!member) {
-            return {
-                name: "회원 정보 없음",
-                birth: "N/A",
-                dday: "N/A",
-                gift: []  // 선물이 없으면 빈 배열 반환
-            };
+            return null; // 회원 정보가 없으면 null 반환
         }
 
-        // 선물 정보 가져오기
+        // 회원 ID로 선물 정보 가져오기
         const [gifts] = await pool.query(
             `SELECT g.id AS gift_id, g.title, g.image 
              FROM gift g
              WHERE g.member_id = ?`, 
-            [member_id]
+            [member.member_id]
         );
 
-        // 선물이 없으면 빈 배열 반환
         const giftList = gifts.length > 0 ? gifts.map(gift => ({
             id: gift.gift_id,
             title: gift.title,
@@ -418,23 +412,23 @@ exports.getWishlistForMember = async (member_id) => {
         let dday;
 
         if (diffTime === 0) {
-            dday = 'day';  // 생일 당일
+            dday = 'day'; // 생일 당일
         } else if (diffTime > 0) {
-            dday = Math.ceil(diffTime / (1000 * 60 * 60 * 24));  // 생일 전
+            dday = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // 생일 전
         } else {
             const nextYearBirthday = new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate());
             const nextDiffTime = nextYearBirthday - today;
-            dday = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24));  // 내년 생일로 D-day 계산
+            dday = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24)); // 내년 생일로 D-day 계산
         }
 
         return {
             name: member.name,
             birth: member.birth,
             dday: dday,
-            gift: giftList  // 선물이 없으면 빈 배열 반환
+            gift: giftList
         };
     } catch (error) {
-        console.error("Error occurred in getWishlistForMember:", error);
+        console.error("Error occurred in getWishlistByLink:", error);
         throw error;
     }
 };

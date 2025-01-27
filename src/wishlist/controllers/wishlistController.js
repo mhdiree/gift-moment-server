@@ -137,36 +137,39 @@ exports.getWishlistByBirthday = async (req, res) => {
 };
 
 // 위시리스트 조회-선물 주는 사람
-exports.getWishlistByMemberId = async (req, res) => {
+exports.getWishlistByLink = async (req, res) => {
     try {
-        const { member_id } = req.params; // URL 경로에서 member_id 추출
+        const { letter_link } = req.query; // URL 쿼리에서 letter_link 추출
 
-        if (!member_id) {
+        if (!letter_link) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Member ID is required',
+                message: 'Letter link is required',
                 data: {}
             });
         }
+        
+        // letter_link 값 확인을 위한 로그 추가
+        console.log('Query executed with letter_link:', letter_link);
 
         // 위시리스트 조회 서비스 호출
-        const wishlist = await wishlistService.getWishlistForMember(member_id);
+        const wishlist = await wishlistService.getWishlistByLink(letter_link);
 
         if (!wishlist) {
             return res.status(404).json({
                 status: 'error',
-                message: 'Wishlist not found for the given Member ID',
+                message: 'Wishlist not found for the given letter link',
                 data: {}
             });
         }
 
         res.status(200).json({
             status: 'success',
-            message: 'Wishlist Fetched successfully',
+            message: 'Wishlist fetched successfully',
             data: wishlist
         });
     } catch (error) {
-        console.error('Error fetching wishlist:', error);
+        console.error('Error fetching wishlist by letter link:', error);
         res.status(500).json({
             status: 'error',
             message: 'Internal Server Error',
