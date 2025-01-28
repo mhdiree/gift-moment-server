@@ -13,7 +13,7 @@ const wishlistRoutes = require('./src/wishlist/routes/wishlistRoutes');
 const app = express();
 
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://13.209.98.232:3000'],
+    origin: ['http://localhost:5173', 'http://13.209.98.232:3000', 'https://d20es7vfr3aiyg.cloudfront.net/'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']  // JWT 토큰 전송을 위해 필요
