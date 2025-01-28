@@ -432,3 +432,77 @@ exports.getWishlistByLink = async (letter_link) => {
         throw error;
     }
 };
+
+// 특정 선물 조회-선물 주는 사람 (로그인한 사용자 ID 포함)
+exports.getGiftDetailsForWishlistByGiverWithToken = async (gift_id, memberId) => {
+    try {
+        // 선물 정보 가져오기
+        const [gift] = await pool.query(
+            `SELECT g.id, g.title, g.image, g.price, g.link, g.description, 
+                    m.name AS giver_name, g.member_id, 
+                    DATE_FORMAT(m.birth_date, '%m월 %d일') AS birth, 
+                    m.birth_date
+             FROM gift g
+             JOIN members m ON g.member_id = m.id
+             WHERE g.id = ?`,
+            [gift_id]
+        );
+
+        if (gift.length === 0) {
+            throw new Error("Gift not found");
+        }
+
+        const giftData = gift[0];
+
+        // 결제 정보 가져오기 (percentage 계산 포함)
+        const [payments] = await pool.query(
+            `SELECT m.name AS payer_name, p.amount
+             FROM payments p
+             JOIN members m ON p.member_id = m.id
+             WHERE p.gift_id = ?`,
+            [gift_id]
+        );
+
+        const paymentDetails = payments.map(payment => ({
+            name: payment.payer_name,
+            percentage: giftData.price > 0 ? Math.floor((parseFloat(payment.amount) / parseFloat(giftData.price)) * 100) : 0,
+        }));
+
+        // 생일을 기준으로 D-day 계산
+        const today = new Date();
+        const birthDate = new Date(giftData.birth_date);
+
+        birthDate.setFullYear(today.getFullYear());
+        if (birthDate < today) {
+            birthDate.setFullYear(today.getFullYear() + 1);
+        }
+
+        const timeDiff = birthDate.getTime() - today.getTime();
+        let dday = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+        if (dday === 0 || dday === 365) {
+            dday = "day";
+        }
+
+        // 최종 데이터 반환
+        return {
+            memberId, // 로그인한 사용자 ID
+            name: giftData.giver_name,
+            birth: giftData.birth,
+            dday,
+            gift: {
+                id: giftData.id,
+                title: giftData.title,
+                image: giftData.image,
+                price: Math.floor(giftData.price),
+                link: giftData.link,
+                description: giftData.description,
+                member_id: giftData.member_id,  // 선물 주인의 member_id
+                payments: paymentDetails,
+            },
+        };
+    } catch (error) {
+        console.error("Error in getGiftDetailsForWishlistByGiverWithToken:", error);
+        throw error;
+    }
+};
