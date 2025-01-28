@@ -38,7 +38,7 @@ class PaymentService {
                     // 도메인은 .env에서 환경변수 변경하면 되고
                     // 경로는 여기서 수정
                     // 카카오 디벨로퍼스에서, Redirect URI 경로 추가도 필요 ('https://developers.kakao.com/console/app/1182262/product/login')
-                    approval_url: `${this.domain}/api/v1/payments/kakao-pay/success`,
+                    approval_url: `${this.domain}/payments/kakao-pay/success`,
                     cancel_url: `${this.domain}/api/v1/payments/kakao-pay/cancel`,
                     fail_url: `${this.domain}/api/v1/payments/kakao-pay/fail`
                 },
