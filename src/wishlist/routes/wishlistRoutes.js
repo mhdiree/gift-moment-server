@@ -25,4 +25,7 @@ router.get('/member/birthday', authenticate, wishlistController.getWishlistByBir
 // 위시리스트 조회-선물 주는 사람
 router.get('/giver/bylink', wishlistController.getWishlistByLink);
 
+// 특정 선물 조회-선물 주는 사람 (로그인한 사용자 ID 포함)
+router.get('/giver/:gift_id', authenticate, wishlistController.getWishlistByGiverWithToken);
+
 module.exports = router;

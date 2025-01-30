@@ -177,3 +177,27 @@ exports.getWishlistByLink = async (req, res) => {
         });
     }
 };
+
+// 특정 선물 조회-선물 주는 사람 (로그인한 사용자 ID 포함)
+exports.getWishlistByGiverWithToken = async (req, res) => {
+    const { gift_id } = req.params;
+    const memberId = req.user.id;  // JWT에서 인증된 사용자 ID
+
+    try {
+        // 선물 정보 및 결제 정보 가져오기
+        const giftDetails = await wishlistService.getGiftDetailsForWishlistByGiverWithToken(gift_id, memberId);
+
+        return res.status(200).json({
+            status: "success",
+            message: "Gift details fetched successfully",
+            data: giftDetails,
+        });
+    } catch (error) {
+        console.error("Error fetching gift details:", error);
+        return res.status(500).json({
+            status: "error",
+            message: "An error occurred while fetching gift details",
+            data: null,
+        });
+    }
+};
