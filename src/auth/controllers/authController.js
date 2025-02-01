@@ -65,18 +65,29 @@ exports.getUserNameAndBirthday = async (req, res) => {
 
         const user = rows2[0];
 
+        // 수정1) 생일 데이터 입력 시 KST 타임 따르도록
+        // 수정2) 오늘 날짜 가져올 때 한국 시간대로 가져오도록
         // 생일 형식 변환 (YYYY-MM-DD -> @월 @일)
         let formattedBirthday = null;
         let isBirthday = false;
         if (user.birth_date) {
-            const birthDate = new Date(user.birth_date);
-            const month = birthDate.getMonth() + 1; // 월 (0부터 시작하므로 +1)
-            const day = birthDate.getDate(); // 일
+            // DB에서 YYYY-MM-DD 형식으로 저장된 생일을 한국 시간(KST) 기준으로 변환
+            const birthDate = new Date(`${user.birth_date}T00:00:00`); // 자정 기준
+            const koreaTime = new Date(birthDate.getTime() + 9 * 60 * 60 * 1000); // KST 변환
+        
+            const month = koreaTime.getMonth() + 1; // 월 (0부터 시작하므로 +1)
+            const day = koreaTime.getDate(); // 일
             formattedBirthday = `${month}월 ${day}일`;
-
-            // 오늘 날짜와 비교하여 생일 여부 확인
-            const today = new Date();
-            if (today.getMonth() + 1 === month && today.getDate() === day) {
+        
+            // 오늘 날짜 (KST 기준)
+            const now = new Date();
+            const todayKST = new Date(now.getTime() + 9 * 60 * 60 * 1000); // 현재 시간도 KST로 변환
+        
+            const todayMonth = todayKST.getMonth() + 1;
+            const todayDay = todayKST.getDate();
+        
+            // 생일 여부 확인
+            if (todayMonth === month && todayDay === day) {
                 isBirthday = true;
             }
         }
